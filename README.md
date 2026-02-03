@@ -145,3 +145,28 @@
 - Сравнение side-by-side
 - Отображение совпадающих событий с выравниванием
 - Подсветка различий
+
+### 7. Проблемы
+
+- Имеются проблемы с переключением на следующий запрос 
+- Модалки деталей собюытия пока не переведены 
+
+### 8. Экраны
+
+**Главный экран:**
+
+<img width="300" height="600" alt="image" src="https://github.com/user-attachments/assets/0fe74b14-923d-4f25-af67-10747eef1829" />
+<img width="300" height="600" alt="image" src="https://github.com/user-attachments/assets/51d90ff2-e22d-4f8f-95a0-e7067fa2645c" />
+
+**Экран сессии:**
+
+<img width="300" height="600" alt="image" src="https://github.com/user-attachments/assets/24db2e72-2119-4673-b07b-b1761964cfd0" />
+<img width="300" height="600" alt="image" src="https://github.com/user-attachments/assets/da912678-05ab-4163-af1c-d9b8e130fb31" />
+
+**Детали события:**
+
+<img width="300" height="600" alt="image" src="https://github.com/user-attachments/assets/a9f4aa82-ef77-4f22-a84a-4d529f9631d8" />
+<img width="300" height="600" alt="image" src="https://github.com/user-attachments/assets/8f90caa8-365f-4b04-810c-8d12fac99a66" />
+
+
+
