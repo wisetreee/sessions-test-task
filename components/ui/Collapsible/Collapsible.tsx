@@ -1,11 +1,12 @@
 import { PropsWithChildren, useState } from "react";
-import { StyleSheet, TouchableOpacity } from "react-native";
+import { TouchableOpacity } from "react-native";
 
-import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
-import { IconSymbol } from "@/components/ui/icon-symbol";
+import { IconSymbol } from "@/components/ui/IconSymbol/IconSymbol";
+import { ThemedText } from "@/components/ui/ThemedText/ThemedText";
+import { ThemedView } from "@/components/ui/ThemedView/ThemedView";
 import { Colors } from "@/constants/theme";
 import { useColorScheme } from "@/hooks/use-color-scheme";
+import { collapsibleStyles as styles } from "./Collapsible.styles";
 
 export function Collapsible({
   children,
@@ -35,15 +36,3 @@ export function Collapsible({
     </ThemedView>
   );
 }
-
-const styles = StyleSheet.create({
-  heading: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  content: {
-    marginTop: 6,
-    marginLeft: 24,
-  },
-});

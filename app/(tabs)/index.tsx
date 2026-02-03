@@ -1,107 +1,218 @@
-import { Image } from "expo-image";
-import { Platform, StyleSheet } from "react-native";
+import { useMemo, useRef, useEffect } from "react";
+import {
+  View,
+  StyleSheet,
+  FlatList,
+  ActivityIndicator,
+  RefreshControl,
+} from "react-native";
 
-import { HelloWave } from "@/components/hello-wave";
-import ParallaxScrollView from "@/components/parallax-scroll-view";
-import { ThemedText } from "@/components/themed-text";
-import { ThemedView } from "@/components/themed-view";
-import { Link } from "expo-router";
+import { useSessionList } from "@/api";
+import { SessionListItem } from "@/types";
+import { calculateSeverity } from "@/utils";
+import { useSessionListStore } from "@/stores";
+import {
+  SessionCard,
+  SessionFilters,
+  SessionSort,
+} from "@/components/sessions";
+import { ThemedText, ThemedView } from "@/components/ui";
 
-export default function HomeScreen() {
-  return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: "#A1CEDC", dark: "#1D3D47" }}
-      headerImage={
-        <Image
-          source={require("@/assets/images/partial-react-logo.png")}
-          style={styles.reactLogo}
-        />
+function filterSessions(
+  sessions: SessionListItem[],
+  filters: ReturnType<typeof useSessionListStore>["filters"],
+): SessionListItem[] {
+  return sessions.filter((session) => {
+    const stats = session.stats || {};
+
+    if (filters.jsErrors && (stats.jsErrors || 0) === 0) return false;
+    if (filters.failedRequests && (stats.failedRequests || 0) === 0)
+      return false;
+    if (filters.pendingRequests && (stats.pendingRequests || 0) === 0)
+      return false;
+    if (filters.rageClicks && (stats.rageClicks || 0) === 0) return false;
+    if (filters.deadClicks && (stats.deadClicks || 0) === 0) return false;
+    if (filters.corrupted && !session.flags?.corrupted) return false;
+
+    if (filters.routeFilter) {
+      const routeFilter = filters.routeFilter.toLowerCase();
+      const entryUrl = (session.entryUrl || "").toLowerCase();
+      const lastRoute = (session.lastRoute || "").toLowerCase();
+
+      if (filters.routeFilterIsRegex) {
+        try {
+          const regex = new RegExp(routeFilter, "i");
+          if (!regex.test(entryUrl) && !regex.test(lastRoute)) {
+            return false;
+          }
+        } catch {
+          return false;
+        }
+      } else {
+        if (
+          !entryUrl.includes(routeFilter) &&
+          !lastRoute.includes(routeFilter)
+        ) {
+          return false;
+        }
       }
-    >
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit{" "}
-          <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText>{" "}
-          to see changes. Press{" "}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: "cmd + d",
-              android: "cmd + m",
-              web: "F12",
-            })}
-          </ThemedText>{" "}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <Link href="/modal">
-          <Link.Trigger>
-            <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-          </Link.Trigger>
-          <Link.Preview />
-          <Link.Menu>
-            <Link.MenuAction
-              title="Action"
-              icon="cube"
-              onPress={() => alert("Action pressed")}
-            />
-            <Link.MenuAction
-              title="Share"
-              icon="square.and.arrow.up"
-              onPress={() => alert("Share pressed")}
-            />
-            <Link.Menu title="More" icon="ellipsis">
-              <Link.MenuAction
-                title="Delete"
-                icon="trash"
-                destructive
-                onPress={() => alert("Delete pressed")}
-              />
-            </Link.Menu>
-          </Link.Menu>
-        </Link>
+    }
 
-        <ThemedText>
-          {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
+    return true;
+  });
+}
+
+function sortSessions(
+  sessions: SessionListItem[],
+  sortField: "startedAt" | "severity",
+  sortDirection: "asc" | "desc",
+): SessionListItem[] {
+  const sorted = [...sessions].sort((a, b) => {
+    let comparison = 0;
+
+    if (sortField === "startedAt") {
+      const aTime = a.startedAt || 0;
+      const bTime = b.startedAt || 0;
+      comparison = aTime - bTime;
+    } else if (sortField === "severity") {
+      const aSeverity = calculateSeverity(a);
+      const bSeverity = calculateSeverity(b);
+      comparison = aSeverity - bSeverity;
+    }
+
+    return sortDirection === "asc" ? comparison : -comparison;
+  });
+
+  return sorted;
+}
+
+export default function SessionListScreen() {
+  const {
+    data,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+    refetch,
+  } = useSessionList(50);
+  const {
+    filters,
+    sortField,
+    sortDirection,
+    scrollPosition,
+    setScrollPosition,
+  } = useSessionListStore();
+  const scrollViewRef = useRef<FlatList>(null);
+
+  const allSessions = useMemo(() => {
+    return data?.pages.flatMap((page) => page.items) || [];
+  }, [data]);
+
+  const filteredSessions = useMemo(() => {
+    return filterSessions(allSessions, filters);
+  }, [allSessions, filters]);
+
+  const sortedSessions = useMemo(() => {
+    return sortSessions(filteredSessions, sortField, sortDirection);
+  }, [filteredSessions, sortField, sortDirection]);
+
+  useEffect(() => {
+    if (scrollPosition > 0 && scrollViewRef.current) {
+      setTimeout(() => {
+        scrollViewRef.current?.scrollToOffset({
+          offset: scrollPosition,
+          animated: false,
+        });
+      }, 100);
+    }
+  }, []);
+
+  const handleScroll = (event: {
+    nativeEvent: { contentOffset: { y: number } };
+  }) => {
+    setScrollPosition(event.nativeEvent.contentOffset.y);
+  };
+
+  const handleLoadMore = () => {
+    if (hasNextPage && !isFetchingNextPage) {
+      fetchNextPage();
+    }
+  };
+
+  if (isLoading && !data) {
+    return (
+      <ThemedView style={styles.centerContainer}>
+        <ActivityIndicator size="large" />
+        <ThemedText style={styles.loadingText}>Загрузка сессий...</ThemedText>
       </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          {`When you're ready, run `}
-          <ThemedText type="defaultSemiBold">
-            npm run reset-project
-          </ThemedText>{" "}
-          to get a fresh <ThemedText type="defaultSemiBold">app</ThemedText>{" "}
-          directory. This will move the current{" "}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{" "}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+    );
+  }
+
+  return (
+    <ThemedView style={styles.container}>
+      <FlatList
+        ref={scrollViewRef}
+        data={sortedSessions}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => <SessionCard session={item} />}
+        ListHeaderComponent={
+          <View>
+            <ThemedText type="title" style={styles.title}>
+              Сессии
+            </ThemedText>
+            <SessionFilters />
+            <SessionSort />
+            <ThemedText style={styles.count}>
+              Показано {sortedSessions.length} из {allSessions.length} сессий
+            </ThemedText>
+          </View>
+        }
+        ListFooterComponent={
+          isFetchingNextPage ? (
+            <View style={styles.footer}>
+              <ActivityIndicator />
+            </View>
+          ) : null
+        }
+        onEndReached={handleLoadMore}
+        onEndReachedThreshold={0.5}
+        onScroll={handleScroll}
+        scrollEventThrottle={16}
+        refreshControl={
+          <RefreshControl refreshing={isLoading} onRefresh={refetch} />
+        }
+        contentContainerStyle={styles.listContent}
+      />
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: "row",
+  container: {
+    flex: 1,
+  },
+  centerContainer: {
+    flex: 1,
+    justifyContent: "center",
     alignItems: "center",
-    gap: 8,
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  loadingText: {
+    marginTop: 16,
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: "absolute",
+  title: {
+    padding: 16,
+    paddingBottom: 8,
+  },
+  count: {
+    padding: 16,
+    paddingTop: 8,
+    fontStyle: "italic",
+  },
+  listContent: {
+    paddingBottom: 16,
+  },
+  footer: {
+    padding: 16,
+    alignItems: "center",
   },
 });
